@@ -3,7 +3,7 @@ import { PointerLockControls } from 'three/examples/jsm/controls/PointerLockCont
 import { createScene } from './world/scene.js';
 
 // --- CONFIG ---
-const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwd95TjfzbNhPTOs_eFXDNylJGTw_6OqCGtJpmicM7vd3YfHhduM1bYYKoAZtUGJ5U/exec"; 
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwd95TjfzbNhPTO_eFXDNylJGTw_6OqCGtJpmicM7vd3YfHhduM1bYYKoAZtUGJ5U/exec"; 
 
 const app = document.getElementById('app');
 const scene = createScene();
@@ -35,27 +35,21 @@ renderer.domElement.addEventListener('touchstart', (e) => {
 
 renderer.domElement.addEventListener('touchmove', (e) => {
     if (!isTouching) return;
-    
-    const touchX = e.touches[0].pageX;
-    const touchY = e.touches[0].pageY;
-    
-    const deltaX = touchX - previousTouch.x;
-    const deltaY = touchY - previousTouch.y;
+    const deltaX = e.touches[0].pageX - previousTouch.x;
+    const deltaY = e.touches[0].pageY - previousTouch.y;
 
-    // Manually rotate camera for touch users
     camera.rotation.y -= deltaX * touchSensitivity;
     camera.rotation.x -= deltaY * touchSensitivity;
     camera.rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, camera.rotation.x));
 
-    previousTouch.x = touchX;
-    previousTouch.y = touchY;
+    previousTouch.x = e.touches[0].pageX;
+    previousTouch.y = e.touches[0].pageY;
 }, { passive: false });
 
 renderer.domElement.addEventListener('touchend', () => isTouching = false);
 
 // --- DESKTOP CLICK TO LOCK ---
 renderer.domElement.addEventListener('click', () => {
-    // Only lock on non-touch devices to avoid errors
     if (isMuseumGenerated && !('ontouchstart' in window)) {
         controls.lock();
     }
@@ -86,7 +80,6 @@ const createControlButtons = () => {
         const el = document.getElementById(id);
         const start = (e) => { e.preventDefault(); moveState[key] = true; };
         const end = (e) => { e.preventDefault(); moveState[key] = false; };
-        
         el.addEventListener('touchstart', start);
         el.addEventListener('touchend', end);
         el.addEventListener('mousedown', start);
@@ -104,38 +97,48 @@ async function buildGallery(rawInput) {
         const response = await fetch(`${APPS_SCRIPT_URL}?id=${folderId}`);
         const imageIds = await response.json();
         
-        // Floor
         const floor = new THREE.Mesh(new THREE.PlaneGeometry(100, 100), new THREE.MeshStandardMaterial({ color: 0x111111 }));
         floor.rotation.x = -Math.PI / 2;
         scene.add(floor);
         scene.add(new THREE.AmbientLight(0xffffff, 0.8));
 
         const loader = new THREE.TextureLoader();
-        imageIds.forEach((id, i) => {
+        loader.setCrossOrigin('anonymous');
+
+        for (let i = 0; i < imageIds.length; i++) {
+            const id = imageIds[i];
             const angle = (i / imageIds.length) * Math.PI * 2;
-            const url = `https://lh3.googleusercontent.com/d/${id}`;
+            
+            // Using the stable thumbnail URL to avoid 429 errors
+            const url = `https://drive.google.com/thumbnail?id=${id}&sz=w1000`;
+
+            await new Promise(resolve => setTimeout(resolve, 300)); // Sequential loading for stability
+
             loader.load(url, (texture) => {
                 const aspect = texture.image.width / texture.image.height;
                 const mesh = new THREE.Mesh(new THREE.PlaneGeometry(4 * aspect, 4), new THREE.MeshStandardMaterial({ map: texture }));
-                mesh.position.set(Math.cos(angle) * 12, 2.5, Math.sin(angle) * 12);
+                mesh.position.set(Math.cos(angle) * 15, 2.5, Math.sin(angle) * 15);
                 mesh.lookAt(0, 2.5, 0);
                 scene.add(mesh);
             });
-        });
-    } catch (err) { console.error(err); }
+        }
+    } catch (err) { console.error("Gallery failed:", err); }
 }
 
-const generateBtn = document.querySelector('button');
-const folderInput = document.querySelector('input');
-
 const startApp = (id) => {
-    document.getElementById('ui').style.display = 'none';
+    const ui = document.getElementById('ui');
+    if (ui) ui.style.display = 'none';
     isMuseumGenerated = true;
     createControlButtons();
     buildGallery(id);
 };
 
-generateBtn.addEventListener('click', () => startApp(folderInput.value.trim()));
+// UI Listeners
+const generateBtn = document.querySelector('button');
+const folderInput = document.querySelector('input');
+if (generateBtn) {
+    generateBtn.addEventListener('click', () => startApp(folderInput.value.trim()));
+}
 
 // --- ANIMATION LOOP ---
 const clock = new THREE.Clock();
@@ -155,12 +158,15 @@ function animate() {
 
     controls.moveRight(-velocity.x * delta);
     controls.moveForward(-velocity.z * delta);
-
     renderer.render(scene, camera);
 }
 animate();
 
 // --- ROUTE RESOLVER ---
-if (window.location.pathname.startsWith('/f/')) {
-    startApp(window.location.pathname.replace('/f/', ''));
-}
+window.addEventListener('load', () => {
+    const path = window.location.pathname;
+    if (path.startsWith('/f/')) {
+        const id = decodeURIComponent(path.replace('/f/', ''));
+        if (id) startApp(id);
+    }
+});
