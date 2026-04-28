@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D AI Museum</title>
+    <link rel="stylesheet" href="./src/style.css">
+</head>
+<body>
+    <div id="app"></div>
+    <div id="ui">
+        <div class="overlay">
+            <h1>Virtual Gallery</h1>
+            <p>Paste Google Drive Folder ID to Begin</p>
+            <input type="text" id="folderId" placeholder="Folder ID...">
+            <button id="loadBtn">Generate Museum</button>
+        </div>
+    </div>
+    <script type="module" src="/src/main.js"></script>
+    <div id="controls-ui" style="display: none;">
+    <div class="control-pad">
+        <button id="move-up">▲</button>
+        <div class="side-buttons">
+            <button id="move-left">◀</button>
+            <button id="move-down">▼</button>
+            <button id="move-right">▶</button>
+        </div>
+    </div>
+    <p>Click screen to look | WASD or Buttons to move</p>
+</div>
+</body>
+</html>
